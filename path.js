@@ -1,5 +1,5 @@
 import {Point} from './point';
-import {cubicCurve} from './mathHelpers';
+import {cubicCurve, dist} from './mathHelpers';
 
 const STEP_SIZE = 0.1;
 const ANCHOR_COLOR = 'red';
@@ -66,21 +66,68 @@ export class Anchor extends Node {
 }
 
 export class Path {
-  constructor() {
+  constructor(startX = 0, startY = 0) {
     this.anchors = [];
     this.grabbedNodes = [];
     this.curveColor = CURVE_COLOR;
     this.isClosed = false;
+    this.addAnchor(startX, startY);
   }
 
   addAnchor(x, y) {
     const anchor = new Anchor(x, y);
     this.anchors.push(anchor);
+    this.grabbedNodes = [anchor];
   }
 
   close() {
     this.anchors.pop();
     this.isClosed = true;
+  }
+
+  onMouseDown(e) {
+    if (this.isClosed) {
+      this.anchors.forEach(anchor => {
+        const p = new Point(e.clientX, e.clientY);
+        if (dist(p, anchor.handles[0]) < anchor.handles[0].radius) {
+          this.grabbedNodes = [anchor.handles[0]];
+          return;
+        } else if (dist(p, anchor.handles[1]) < anchor.handles[1].radius) {
+          this.grabbedNodes = [anchor.handles[1]];
+          return;
+        } else if (dist(p, anchor) < anchor.radius) {
+          this.grabbedNodes = [anchor];
+          return;
+        }
+      });
+      return;
+    }
+
+    if (this.anchors.length >= 3 &&
+      dist(new Point(e.clientX, e.clientY), this.anchors[0]) < this.anchors[0].radius) {
+      this.close();
+      return;
+    }
+
+    this.grabbedNodes = [this.anchors[this.anchors.length - 1].handles[1]];
+  }
+
+  onMouseUp(e) {
+    if (this.isClosed) {
+      this.grabbedNodes = [];
+      return;
+    }
+
+    this.addAnchor(e.clientX, e.clientY);
+  }
+
+  onMouseMove(e) {
+    if (this.isClosed) {
+      this.grabbedNodes.forEach(node => node.moveTo(e.clientX, e.clientY));
+      return;
+    }
+
+    this.grabbedNodes.forEach(node => node.moveTo(e.clientX, e.clientY));
   }
 
   draw(ctx) {
